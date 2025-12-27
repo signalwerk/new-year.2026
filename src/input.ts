@@ -11,9 +11,16 @@ export class InputHandler {
   private previousJumpState: boolean = false;
   
   // Touch control elements
-  private leftBtn: HTMLElement | null = null;
-  private rightBtn: HTMLElement | null = null;
+  private dpad: HTMLElement | null = null;
+  private dpadKnob: HTMLElement | null = null;
   private jumpBtn: HTMLElement | null = null;
+  
+  // D-pad state
+  private dpadActive: boolean = false;
+  private dpadCenterX: number = 0;
+  private dpadCenterY: number = 0;
+  private dpadRadius: number = 50;
+  private currentTouchId: number | null = null;
   
   constructor() {
     this.setupKeyboardListeners();
@@ -67,8 +74,13 @@ export class InputHandler {
     container.id = 'touch-controls';
     container.innerHTML = `
       <div class="controls-left">
-        <button id="btn-left" class="control-btn">◀</button>
-        <button id="btn-right" class="control-btn">▶</button>
+        <div id="dpad" class="dpad">
+          <div id="dpad-knob" class="dpad-knob"></div>
+          <div class="dpad-arrows">
+            <span class="dpad-arrow left">◀</span>
+            <span class="dpad-arrow right">▶</span>
+          </div>
+        </div>
       </div>
       <div class="controls-right">
         <button id="btn-jump" class="control-btn jump-btn">▲</button>
@@ -76,19 +88,142 @@ export class InputHandler {
     `;
     document.body.appendChild(container);
     
-    // Get button references
-    this.leftBtn = document.getElementById('btn-left');
-    this.rightBtn = document.getElementById('btn-right');
+    // Get element references
+    this.dpad = document.getElementById('dpad');
+    this.dpadKnob = document.getElementById('dpad-knob');
     this.jumpBtn = document.getElementById('btn-jump');
     
-    // Setup touch events with pointer events for better compatibility
-    this.setupButtonEvents(this.leftBtn, 'left');
-    this.setupButtonEvents(this.rightBtn, 'right');
+    // Setup d-pad events
+    this.setupDpadEvents();
+    
+    // Setup jump button events
     this.setupButtonEvents(this.jumpBtn, 'jump');
     
     // Prevent default touch behavior to avoid scrolling
     container.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
     container.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  }
+  
+  private setupDpadEvents(): void {
+    if (!this.dpad || !this.dpadKnob) return;
+    
+    const handleStart = (clientX: number, clientY: number, touchId?: number) => {
+      const rect = this.dpad!.getBoundingClientRect();
+      this.dpadCenterX = rect.left + rect.width / 2;
+      this.dpadCenterY = rect.top + rect.height / 2;
+      this.dpadRadius = rect.width / 2 - 25; // Leave room for knob
+      this.dpadActive = true;
+      if (touchId !== undefined) {
+        this.currentTouchId = touchId;
+      }
+      this.dpad!.classList.add('active');
+      this.updateDpadPosition(clientX, clientY);
+    };
+    
+    const handleMove = (clientX: number, clientY: number) => {
+      if (!this.dpadActive) return;
+      this.updateDpadPosition(clientX, clientY);
+    };
+    
+    const handleEnd = () => {
+      this.dpadActive = false;
+      this.currentTouchId = null;
+      this.state.left = false;
+      this.state.right = false;
+      this.dpad!.classList.remove('active');
+      this.dpadKnob!.classList.remove('left', 'right');
+      // Reset knob position
+      this.dpadKnob!.style.transform = 'translate(-50%, -50%)';
+    };
+    
+    // Touch events
+    this.dpad.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      handleStart(touch.clientX, touch.clientY, touch.identifier);
+    }, { passive: false });
+    
+    window.addEventListener('touchmove', (e) => {
+      if (!this.dpadActive) return;
+      // Find the touch that started on the dpad
+      for (let i = 0; i < e.touches.length; i++) {
+        const touch = e.touches[i];
+        if (touch.identifier === this.currentTouchId) {
+          handleMove(touch.clientX, touch.clientY);
+          break;
+        }
+      }
+    }, { passive: false });
+    
+    window.addEventListener('touchend', (e) => {
+      // Check if the touch that ended was our dpad touch
+      let stillActive = false;
+      for (let i = 0; i < e.touches.length; i++) {
+        if (e.touches[i].identifier === this.currentTouchId) {
+          stillActive = true;
+          break;
+        }
+      }
+      if (!stillActive && this.dpadActive) {
+        handleEnd();
+      }
+    }, { passive: false });
+    
+    window.addEventListener('touchcancel', () => {
+      if (this.dpadActive) {
+        handleEnd();
+      }
+    }, { passive: false });
+    
+    // Mouse events for desktop testing
+    this.dpad.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      handleStart(e.clientX, e.clientY);
+    });
+    
+    window.addEventListener('mousemove', (e) => {
+      handleMove(e.clientX, e.clientY);
+    });
+    
+    window.addEventListener('mouseup', () => {
+      if (this.dpadActive) {
+        handleEnd();
+      }
+    });
+  }
+  
+  private updateDpadPosition(clientX: number, clientY: number): void {
+    if (!this.dpadKnob) return;
+    
+    // Calculate offset from center
+    let offsetX = clientX - this.dpadCenterX;
+    const offsetY = clientY - this.dpadCenterY;
+    
+    // Clamp to radius (horizontal only for left/right)
+    const maxOffset = this.dpadRadius;
+    offsetX = Math.max(-maxOffset, Math.min(maxOffset, offsetX));
+    
+    // Update knob visual position
+    this.dpadKnob.style.transform = `translate(calc(-50% + ${offsetX}px), -50%)`;
+    
+    // Determine direction based on offset
+    const deadzone = 15; // Pixels of deadzone in center
+    
+    if (offsetX < -deadzone) {
+      this.state.left = true;
+      this.state.right = false;
+      this.dpadKnob.classList.add('left');
+      this.dpadKnob.classList.remove('right');
+    } else if (offsetX > deadzone) {
+      this.state.left = false;
+      this.state.right = true;
+      this.dpadKnob.classList.remove('left');
+      this.dpadKnob.classList.add('right');
+    } else {
+      this.state.left = false;
+      this.state.right = false;
+      this.dpadKnob.classList.remove('left', 'right');
+    }
   }
   
   private setupButtonEvents(button: HTMLElement | null, action: 'left' | 'right' | 'jump'): void {
@@ -153,4 +288,3 @@ export class InputHandler {
     return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   }
 }
-

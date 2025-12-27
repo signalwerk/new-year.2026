@@ -58,12 +58,17 @@ export interface Projectile extends Rectangle {
   color: string;
 }
 
+export interface Portal extends Rectangle {
+  color: string;
+}
+
 export interface LevelData {
   platforms: Platform[];
   enemies: Enemy[];
   collectibles: Collectible[];
   cannons: Cannon[];
   projectiles: Projectile[];
+  portal: Portal | null;
   playerStart: Vector2;
   levelHeight: number;
   levelWidth: number;
@@ -120,6 +125,10 @@ export const TILE_TYPES = {
   'C': 'collectible-coin',
   '💎': 'collectible-powerup',
   'U': 'collectible-powerup',
+  
+  // Portal (goal)
+  '🌀': 'portal',
+  'O': 'portal',
   
   // Empty
   ' ': 'empty',

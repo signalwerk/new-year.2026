@@ -30,6 +30,7 @@ canvas {
   right: 0;
   display: flex;
   justify-content: space-between;
+  align-items: flex-end;
   padding: 20px;
   pointer-events: none;
   z-index: 100;
@@ -37,11 +38,80 @@ canvas {
 
 .controls-left,
 .controls-right {
-  display: flex;
-  gap: 15px;
   pointer-events: auto;
 }
 
+/* D-Pad Joystick Style */
+.dpad {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.dpad.active {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Direction arrows in background */
+.dpad-arrows {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  pointer-events: none;
+}
+
+.dpad-arrow {
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.2);
+  transition: color 0.1s ease;
+}
+
+.dpad.active .dpad-arrow {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* The draggable knob */
+.dpad-knob {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.15));
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transition: background 0.1s ease, border-color 0.1s ease, box-shadow 0.1s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.dpad-knob.left {
+  background: linear-gradient(145deg, rgba(52, 152, 219, 0.6), rgba(52, 152, 219, 0.3));
+  border-color: rgba(52, 152, 219, 0.8);
+  box-shadow: 0 0 15px rgba(52, 152, 219, 0.4);
+}
+
+.dpad-knob.right {
+  background: linear-gradient(145deg, rgba(52, 152, 219, 0.6), rgba(52, 152, 219, 0.3));
+  border-color: rgba(52, 152, 219, 0.8);
+  box-shadow: 0 0 15px rgba(52, 152, 219, 0.4);
+}
+
+/* Jump button */
 .control-btn {
   width: 70px;
   height: 70px;
@@ -73,35 +143,40 @@ canvas {
 }
 
 .jump-btn {
-  width: 90px;
-  height: 90px;
-  font-size: 36px;
-  background: rgba(52, 152, 219, 0.2);
-  border-color: rgba(52, 152, 219, 0.6);
+  width: 100px;
+  height: 100px;
+  font-size: 40px;
+  background: rgba(52, 152, 219, 0.15);
+  border-color: rgba(52, 152, 219, 0.5);
 }
 
 .jump-btn:hover {
-  background: rgba(52, 152, 219, 0.3);
-  border-color: rgba(52, 152, 219, 0.8);
+  background: rgba(52, 152, 219, 0.25);
+  border-color: rgba(52, 152, 219, 0.7);
 }
 
 .jump-btn.active {
-  background: rgba(52, 152, 219, 0.5);
+  background: rgba(52, 152, 219, 0.4);
   border-color: rgba(52, 152, 219, 1);
+  box-shadow: 0 0 20px rgba(52, 152, 219, 0.5);
 }
 
 /* Mobile-first responsive adjustments */
 @media (max-width: 768px) {
-  .control-btn {
-    width: 65px;
-    height: 65px;
-    font-size: 24px;
+  .dpad {
+    width: 110px;
+    height: 110px;
+  }
+  
+  .dpad-knob {
+    width: 45px;
+    height: 45px;
   }
   
   .jump-btn {
-    width: 80px;
-    height: 80px;
-    font-size: 30px;
+    width: 90px;
+    height: 90px;
+    font-size: 36px;
   }
   
   #touch-controls {
@@ -110,25 +185,28 @@ canvas {
 }
 
 @media (max-width: 480px) {
-  .control-btn {
-    width: 55px;
-    height: 55px;
-    font-size: 20px;
+  .dpad {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .dpad-knob {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .dpad-arrow {
+    font-size: 16px;
   }
   
   .jump-btn {
-    width: 70px;
-    height: 70px;
-    font-size: 26px;
+    width: 80px;
+    height: 80px;
+    font-size: 32px;
   }
   
   #touch-controls {
     padding: 10px;
-  }
-  
-  .controls-left,
-  .controls-right {
-    gap: 10px;
   }
 }
 

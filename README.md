@@ -1,6 +1,10 @@
-# Vanilla TypeScript Canvas App with Vite
+# New Year Game 2026
 
-A minimal TypeScript project with Vite that renders to an HTML canvas.
+$description
+
+- https://2026.new-year.signalwerk.ch/dev/
+- https://2026.new-year.signalwerk.ch/game/neo/
+- https://2026.new-year.signalwerk.ch/luan/
 
 ## Development
 

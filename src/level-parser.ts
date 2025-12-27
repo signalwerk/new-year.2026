@@ -5,6 +5,7 @@ import {
   Collectible, 
   Cannon,
   Projectile,
+  Portal,
   Vector2, 
   TILE_TYPES, 
   TileType 
@@ -41,6 +42,7 @@ export function parseLevel(asciiLevel: string): LevelData {
   const collectibles: Collectible[] = [];
   const cannons: Cannon[] = [];
   const projectiles: Projectile[] = [];
+  let portal: Portal | null = null;
   let playerStart: Vector2 = { x: 100, y: 100 };
   
   // Level is read top-to-bottom, but we need to flip Y for game coordinates
@@ -141,6 +143,15 @@ export function parseLevel(asciiLevel: string): LevelData {
             color: '#5c6370',
           });
         }
+        else if (tileType === 'portal') {
+          portal = {
+            x: gameX,
+            y: gameY,
+            width: TILE_SIZE * 2,
+            height: TILE_SIZE * 2,
+            color: '#9b59b6',
+          };
+        }
       }
       col++;
     }
@@ -179,6 +190,7 @@ export function parseLevel(asciiLevel: string): LevelData {
     collectibles,
     cannons,
     projectiles,
+    portal,
     playerStart,
     levelHeight,
     levelWidth: maxWidth,
@@ -189,8 +201,10 @@ export function parseLevel(asciiLevel: string): LevelData {
 // Legend:
 // ▓ = normal platform, ~ = moving platform, ○ = bouncy platform
 // P = player start, W = walker, S = static hazard, F = flyer
-// * = star, > = cannon right, < = cannon left
+// * = star, > = cannon right, < = cannon left, O = portal (goal)
 export const DEMO_LEVEL = `
+................................
+...............O................
 ................................
 ...............*................
 .......▓▓▓▓▓▓▓▓▓▓▓▓▓▓..........
