@@ -113,7 +113,7 @@ export class Game {
     
     // Check enemy collisions (only if not invincible)
     if (!this.player.isInvincible) {
-      const enemyHit = checkEnemyCollision(this.player.getBounds(), this.level.enemies);
+      const enemyHit = checkEnemyCollision(this.player.getBounds(), this.level.enemies, this.player.velocityY);
       if (enemyHit.hit && enemyHit.enemy) {
         if (enemyHit.stomped) {
           // Player stomped on enemy

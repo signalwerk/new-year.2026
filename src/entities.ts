@@ -169,7 +169,8 @@ export function checkProjectileCollision(playerBounds: Rectangle, projectiles: P
 }
 
 // Check collision between player bounds and enemy
-export function checkEnemyCollision(playerBounds: Rectangle, enemies: Enemy[]): { hit: boolean; stomped: boolean; enemy?: Enemy } {
+// playerVelocityY: negative = falling down, positive = jumping up
+export function checkEnemyCollision(playerBounds: Rectangle, enemies: Enemy[], playerVelocityY: number = 0): { hit: boolean; stomped: boolean; enemy?: Enemy } {
   for (const enemy of enemies) {
     if (!enemy.alive) continue;
     
@@ -180,13 +181,21 @@ export function checkEnemyCollision(playerBounds: Rectangle, enemies: Enemy[]): 
       }
       
       // Check if player is stomping (coming from above) for other enemies
+      // Player must be FALLING (velocityY < 0) to stomp
       const playerBottom = playerBounds.y;
       const enemyTop = enemy.y + enemy.height;
       const playerCenterX = playerBounds.x + playerBounds.width / 2;
       const enemyCenterX = enemy.x + enemy.width / 2;
       
-      // Stomp if player is falling onto enemy from above
-      if (playerBottom < enemyTop + 10 && Math.abs(playerCenterX - enemyCenterX) < enemy.width * 0.6) {
+      // Stomp ONLY if:
+      // 1. Player is falling (velocityY < 0)
+      // 2. Player's bottom is near enemy's top
+      // 3. Player is horizontally aligned with enemy
+      const isFalling = playerVelocityY < 0;
+      const isAboveEnemy = playerBottom < enemyTop + 10 && playerBottom > enemy.y;
+      const isAligned = Math.abs(playerCenterX - enemyCenterX) < enemy.width * 0.7;
+      
+      if (isFalling && isAboveEnemy && isAligned) {
         return { hit: true, stomped: true, enemy };
       }
       
