@@ -388,6 +388,9 @@ export class Game {
       ctx.translate(-cameraX + shakeX, this.cameraY + height + shakeY);
       ctx.scale(1, -1);
       
+      // Render walls (left and right boundaries)
+      this.renderWalls(ctx);
+      
       // Render platforms
       for (const platform of this.level.platforms) {
         if (this.isVisible(platform.y, platform.height)) {
@@ -680,6 +683,54 @@ export class Game {
     ctx.fillStyle = '#888888';
     ctx.font = `18px ${FONT_BODY}`;
     ctx.fillText(TEXT.gameOver.restartHint, width / 2, height / 2 + 60);
+  }
+  
+  private renderWalls(ctx: CanvasRenderingContext2D): void {
+    const wallWidth = 20;
+    const levelWidth = this.level.levelWidth;
+    const levelHeight = this.level.levelHeight;
+    
+    // Extend walls beyond visible area
+    const wallBottom = -100;
+    const wallTop = levelHeight + 500;
+    const wallHeight = wallTop - wallBottom;
+    
+    // Wall gradient colors
+    const wallColorDark = '#2c3e50';
+    const wallColorLight = '#34495e';
+    const wallHighlight = '#4a6278';
+    
+    // Left wall
+    ctx.fillStyle = wallColorDark;
+    ctx.fillRect(-wallWidth, wallBottom, wallWidth, wallHeight);
+    
+    // Left wall inner edge highlight
+    ctx.fillStyle = wallHighlight;
+    ctx.fillRect(-4, wallBottom, 4, wallHeight);
+    
+    // Left wall brick pattern
+    ctx.fillStyle = wallColorLight;
+    const brickHeight = 40;
+    const brickOffset = 20;
+    for (let y = wallBottom; y < wallTop; y += brickHeight) {
+      const offset = Math.floor(y / brickHeight) % 2 === 0 ? 0 : brickOffset;
+      ctx.fillRect(-wallWidth + offset, y, wallWidth / 2 - 2, brickHeight - 2);
+    }
+    
+    // Right wall
+    ctx.fillStyle = wallColorDark;
+    ctx.fillRect(levelWidth, wallBottom, wallWidth, wallHeight);
+    
+    // Right wall inner edge highlight
+    ctx.fillStyle = wallHighlight;
+    ctx.fillRect(levelWidth, wallBottom, 4, wallHeight);
+    
+    // Right wall brick pattern
+    ctx.fillStyle = wallColorLight;
+    for (let y = wallBottom; y < wallTop; y += brickHeight) {
+      const offset = Math.floor(y / brickHeight) % 2 === 0 ? brickOffset : 0;
+      ctx.fillRect(levelWidth + offset, y, wallWidth / 2 - 2, brickHeight - 2);
+    }
   }
   
   private restart(): void {
