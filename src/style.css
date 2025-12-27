@@ -16,14 +16,6 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: 'Space Mono';
-  src: url('/assets/fonts/space-mono/SpaceMono-Bold.ttf') format('truetype');
-  font-weight: bold;
-  font-style: normal;
-  font-display: swap;
-}
-
 * {
   margin: 0;
   padding: 0;
@@ -146,7 +138,7 @@ canvas {
   background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.7);
   font-size: 28px;
-  font-weight: bold;
+  /* font-weight: bold; */
   display: flex;
   align-items: center;
   justify-content: center;

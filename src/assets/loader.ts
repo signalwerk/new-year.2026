@@ -48,11 +48,6 @@ const FONTS: FontDefinition[] = [
     url: '/assets/fonts/space-mono/SpaceMono-Regular.ttf',
     weight: 'normal',
   },
-  {
-    family: 'Space Mono',
-    url: '/assets/fonts/space-mono/SpaceMono-Bold.ttf',
-    weight: 'bold',
-  },
 ];
 
 export class AssetLoader {

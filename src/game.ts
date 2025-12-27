@@ -384,11 +384,15 @@ export class Game {
         shakeY = (Math.random() - 0.5) * this.SCREEN_SHAKE_INTENSITY * 2;
       }
       
-      const cameraX = Math.max(0, this.player.getCenterX() - width / 2);
+      // Allow camera to show wall areas (negative X for left wall, beyond levelWidth for right wall)
+      const wallWidth = 24;
+      const minCameraX = -wallWidth;
+      const maxCameraX = Math.max(0, this.level.levelWidth + wallWidth - width);
+      const cameraX = Math.max(minCameraX, Math.min(maxCameraX, this.player.getCenterX() - width / 2));
       ctx.translate(-cameraX + shakeX, this.cameraY + height + shakeY);
       ctx.scale(1, -1);
       
-      // Render walls (left and right boundaries)
+      // Render walls (left and right boundaries) - rendered first, positioned outside game area
       this.renderWalls(ctx);
       
       // Render platforms
@@ -495,7 +499,7 @@ export class Game {
     
     // Button text - using Space Mono
     ctx.fillStyle = '#1a1a2e';
-    ctx.font = `bold 32px ${FONT_BODY}`;
+    ctx.font = `32px ${FONT_BODY}`;
     ctx.fillText(TEXT.intro.startButton, width / 2, btnY + btnHeight / 2 + 10);
     
     // Additional text - using Space Mono
@@ -595,7 +599,7 @@ export class Game {
     
     // Score
     ctx.fillStyle = '#3498db';
-    ctx.font = `bold 28px ${FONT_BODY}`;
+    ctx.font = `28px ${FONT_BODY}`;
     ctx.fillText(interpolate(TEXT.win.finalScore, { score: this.state.score }), width / 2, height * 0.58);
     
     // Message
@@ -650,7 +654,7 @@ export class Game {
     const padding = 20;
     
     ctx.fillStyle = '#ffffff';
-    ctx.font = `bold 24px ${FONT_BODY}`;
+    ctx.font = `24px ${FONT_BODY}`;
     ctx.textAlign = 'left';
     ctx.fillText(interpolate(TEXT.ui.score, { score: this.state.score }), padding, padding + 24);
     
@@ -686,7 +690,7 @@ export class Game {
   }
   
   private renderWalls(ctx: CanvasRenderingContext2D): void {
-    const wallWidth = 20;
+    const wallWidth = 24;
     const levelWidth = this.level.levelWidth;
     const levelHeight = this.level.levelHeight;
     
@@ -695,42 +699,46 @@ export class Game {
     const wallTop = levelHeight + 500;
     const wallHeight = wallTop - wallBottom;
     
-    // Wall gradient colors
+    // Wall colors
     const wallColorDark = '#2c3e50';
     const wallColorLight = '#34495e';
-    const wallHighlight = '#4a6278';
-    
-    // Left wall
-    ctx.fillStyle = wallColorDark;
-    ctx.fillRect(-wallWidth, wallBottom, wallWidth, wallHeight);
-    
-    // Left wall inner edge highlight
-    ctx.fillStyle = wallHighlight;
-    ctx.fillRect(-4, wallBottom, 4, wallHeight);
-    
-    // Left wall brick pattern
-    ctx.fillStyle = wallColorLight;
+    const wallEdge = '#1a252f';
     const brickHeight = 40;
-    const brickOffset = 20;
-    for (let y = wallBottom; y < wallTop; y += brickHeight) {
-      const offset = Math.floor(y / brickHeight) % 2 === 0 ? 0 : brickOffset;
-      ctx.fillRect(-wallWidth + offset, y, wallWidth / 2 - 2, brickHeight - 2);
-    }
     
-    // Right wall
+    // Overlap by 1 pixel into game area to prevent sub-pixel gaps
+    const overlap = 1;
+    
+    // === LEFT WALL (extends from -wallWidth to overlap pixels into game area) ===
+    // Main wall body
     ctx.fillStyle = wallColorDark;
-    ctx.fillRect(levelWidth, wallBottom, wallWidth, wallHeight);
+    ctx.fillRect(-wallWidth, wallBottom, wallWidth + overlap, wallHeight);
     
-    // Right wall inner edge highlight
-    ctx.fillStyle = wallHighlight;
-    ctx.fillRect(levelWidth, wallBottom, 4, wallHeight);
-    
-    // Right wall brick pattern
+    // Brick pattern on left wall
     ctx.fillStyle = wallColorLight;
     for (let y = wallBottom; y < wallTop; y += brickHeight) {
-      const offset = Math.floor(y / brickHeight) % 2 === 0 ? brickOffset : 0;
-      ctx.fillRect(levelWidth + offset, y, wallWidth / 2 - 2, brickHeight - 2);
+      const offset = Math.floor(y / brickHeight) % 2 === 0 ? 2 : 12;
+      ctx.fillRect(-wallWidth + offset, y + 2, 8, brickHeight - 4);
     }
+    
+    // Dark edge stripe at the inner edge - creates depth
+    ctx.fillStyle = wallEdge;
+    ctx.fillRect(-4, wallBottom, 4 + overlap, wallHeight);
+    
+    // === RIGHT WALL (extends from levelWidth-overlap to levelWidth+wallWidth) ===
+    // Main wall body
+    ctx.fillStyle = wallColorDark;
+    ctx.fillRect(levelWidth - overlap, wallBottom, wallWidth + overlap, wallHeight);
+    
+    // Brick pattern on right wall
+    ctx.fillStyle = wallColorLight;
+    for (let y = wallBottom; y < wallTop; y += brickHeight) {
+      const offset = Math.floor(y / brickHeight) % 2 === 0 ? 12 : 2;
+      ctx.fillRect(levelWidth + offset, y + 2, 8, brickHeight - 4);
+    }
+    
+    // Dark edge stripe at the inner edge - creates depth
+    ctx.fillStyle = wallEdge;
+    ctx.fillRect(levelWidth - overlap, wallBottom, 4 + overlap, wallHeight);
   }
   
   private restart(): void {
