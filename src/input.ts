@@ -18,7 +18,6 @@ export class InputHandler {
   // D-pad state
   private dpadActive: boolean = false;
   private dpadCenterX: number = 0;
-  private dpadCenterY: number = 0;
   private dpadRadius: number = 50;
   private currentTouchId: number | null = null;
   
@@ -110,7 +109,6 @@ export class InputHandler {
     const handleStart = (clientX: number, clientY: number, touchId?: number) => {
       const rect = this.dpad!.getBoundingClientRect();
       this.dpadCenterX = rect.left + rect.width / 2;
-      this.dpadCenterY = rect.top + rect.height / 2;
       this.dpadRadius = rect.width / 2 - 25; // Leave room for knob
       this.dpadActive = true;
       if (touchId !== undefined) {
@@ -192,12 +190,11 @@ export class InputHandler {
     });
   }
   
-  private updateDpadPosition(clientX: number, clientY: number): void {
+  private updateDpadPosition(clientX: number, _clientY: number): void {
     if (!this.dpadKnob) return;
     
-    // Calculate offset from center
+    // Calculate offset from center (horizontal only)
     let offsetX = clientX - this.dpadCenterX;
-    const offsetY = clientY - this.dpadCenterY;
     
     // Clamp to radius (horizontal only for left/right)
     const maxOffset = this.dpadRadius;

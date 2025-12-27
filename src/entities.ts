@@ -67,7 +67,6 @@ function updateWalkerEnemy(enemy: Enemy, platforms: Platform[], deltaTime: numbe
   }
   
   // Check platform edges (don't walk off)
-  let onPlatform = false;
   for (const platform of platforms) {
     // Check if enemy is above this platform
     if (
@@ -75,8 +74,6 @@ function updateWalkerEnemy(enemy: Enemy, platforms: Platform[], deltaTime: numbe
       enemy.x < platform.x + platform.width &&
       Math.abs((enemy.y) - (platform.y + platform.height)) < 5
     ) {
-      onPlatform = true;
-      
       // Check if about to walk off edge
       if (enemy.direction > 0 && enemy.x + enemy.width > platform.x + platform.width - 10) {
         enemy.direction = -1;
@@ -88,7 +85,7 @@ function updateWalkerEnemy(enemy: Enemy, platforms: Platform[], deltaTime: numbe
   }
 }
 
-function updateJumperEnemy(enemy: Enemy, deltaTime: number): void {
+function updateJumperEnemy(enemy: Enemy, _deltaTime: number): void {
   // Simple bounce animation - faster
   const time = Date.now() / 300;
   enemy.y = (enemy.startY || enemy.y) + Math.sin(time) * 25;

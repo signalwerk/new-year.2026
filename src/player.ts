@@ -176,7 +176,7 @@ export class Player implements Entity {
     return horizontalOverlap && verticalLanding;
   }
   
-  private intersects(rect: Rectangle): boolean {
+  intersects(rect: Rectangle): boolean {
     return (
       this.x < rect.x + rect.width &&
       this.x + this.width > rect.x &&

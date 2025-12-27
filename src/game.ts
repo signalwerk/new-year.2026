@@ -1,4 +1,4 @@
-import { GameState, LevelData, Rectangle } from './types';
+import { GameState, LevelData } from './types';
 import { Player } from './player';
 import { InputHandler } from './input';
 import { parseLevel, DEMO_LEVEL, TILE_SIZE } from './level-parser';
@@ -16,6 +16,12 @@ import {
   renderCannon,
   renderProjectile,
 } from './entities';
+import { TEXT, interpolate } from './config/text';
+import { SoundManager } from './assets/loader';
+
+// Font constants
+const FONT_TITLE = "'Pilowlava', 'Comic Sans MS', cursive";
+const FONT_BODY = "'Space Mono', monospace";
 
 type ScreenState = 'intro' | 'playing' | 'gameover' | 'won';
 
@@ -32,6 +38,9 @@ export class Game {
   private player!: Player;
   private level!: LevelData;
   private input: InputHandler;
+  
+  // Sound manager
+  private sound: SoundManager;
   
   // Camera
   private cameraY: number = 0;
@@ -59,8 +68,14 @@ export class Game {
   private screenShakeTimer: number = 0;
   private readonly SCREEN_SHAKE_INTENSITY = 8;
   
-  constructor(canvas: HTMLCanvasElement) {
+  // Display dimensions (CSS pixels, not device pixels)
+  private displayWidth: number = 0;
+  private displayHeight: number = 0;
+  private pixelRatio: number = 1;
+  
+  constructor(canvas: HTMLCanvasElement, soundManager: SoundManager) {
     this.canvas = canvas;
+    this.sound = soundManager;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       throw new Error('Failed to get canvas context');
@@ -116,7 +131,7 @@ export class Game {
     this.player = new Player(this.level.playerStart.x, this.level.playerStart.y);
     
     // Initialize camera
-    this.cameraY = this.player.getCenterY() - this.canvas.height * this.CAMERA_OFFSET_Y;
+    this.cameraY = this.player.getCenterY() - this.displayHeight * this.CAMERA_OFFSET_Y;
     this.cameraTargetY = this.cameraY;
     this.highestY = this.player.getCenterY();
     
@@ -139,8 +154,24 @@ export class Game {
   }
   
   private resizeCanvas(): void {
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
+    // Get the device pixel ratio for high-DPI displays
+    this.pixelRatio = window.devicePixelRatio || 1;
+    
+    // Get the display size in CSS pixels
+    this.displayWidth = window.innerWidth;
+    this.displayHeight = window.innerHeight;
+    
+    // Set the canvas buffer size (actual pixels)
+    this.canvas.width = this.displayWidth * this.pixelRatio;
+    this.canvas.height = this.displayHeight * this.pixelRatio;
+    
+    // Set the display size via CSS
+    this.canvas.style.width = `${this.displayWidth}px`;
+    this.canvas.style.height = `${this.displayHeight}px`;
+    
+    // Scale the context to account for the pixel ratio
+    // This allows us to use CSS pixel coordinates in our drawing code
+    this.ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
   }
   
   private update(deltaTime: number): void {
@@ -149,6 +180,10 @@ export class Game {
     
     // Get input
     const inputState = this.input.getState();
+    
+    // Track player state before update
+    const wasOnGroundBefore = this.player.isOnGround;
+    const velocityYBefore = this.player.velocityY;
     
     // Create combined platforms list (including cannons as platforms)
     const allPlatforms = [
@@ -166,16 +201,38 @@ export class Game {
     // Update player
     this.player.update(deltaTime, inputState, allPlatforms, this.level.levelWidth);
     
+    // Sound: Jump
+    if (!wasOnGroundBefore && this.player.isOnGround && velocityYBefore < -50) {
+      // Just landed
+      this.sound.play('land');
+    }
+    if (wasOnGroundBefore && !this.player.isOnGround && this.player.velocityY > 0) {
+      // Just jumped
+      this.sound.play('jump');
+    }
+    // Sound: Bounce (from bouncy platform)
+    if (this.player.velocityY > 500 && velocityYBefore < 200) {
+      this.sound.play('bounce');
+    }
+    
     // Update entities
     updatePlatforms(this.level.platforms, deltaTime);
     updateEnemies(this.level.enemies, this.level.platforms, deltaTime);
+    
+    // Track cannon fire for sound
+    const prevProjectileCount = this.level.projectiles.length;
     updateCannons(this.level.cannons, this.level.projectiles, performance.now());
+    if (this.level.projectiles.length > prevProjectileCount) {
+      this.sound.play('cannon');
+    }
+    
     updateProjectiles(this.level.projectiles, deltaTime, this.level.levelWidth);
     
     // Check portal collision (win condition)
     if (this.level.portal && this.checkPortalCollision()) {
       this.state.won = true;
       this.screenState = 'won';
+      this.sound.play('win');
       this.setupEndScreenListener();
     }
     
@@ -187,6 +244,7 @@ export class Game {
           enemyHit.enemy.alive = false;
           this.state.score += 100;
           this.player.velocityY = 400;
+          this.sound.play('stomp');
         } else {
           this.playerHit();
         }
@@ -200,6 +258,7 @@ export class Game {
     // Check collectibles
     const collected = checkCollectiblePickup(this.player.getBounds(), this.level.collectibles);
     if (collected) {
+      this.sound.play('coin');
       switch (collected.type) {
         case 'coin':
           this.state.score += 10;
@@ -227,12 +286,12 @@ export class Game {
     
     // Update camera
     const playerScreenY = this.player.getCenterY();
-    const idealCameraY = playerScreenY - this.canvas.height * this.CAMERA_OFFSET_Y;
+    const idealCameraY = playerScreenY - this.displayHeight * this.CAMERA_OFFSET_Y;
     
     if (idealCameraY > this.cameraTargetY) {
       this.cameraTargetY = idealCameraY;
-    } else if (idealCameraY < this.cameraTargetY - this.canvas.height * 0.5) {
-      this.cameraTargetY = idealCameraY + this.canvas.height * 0.3;
+    } else if (idealCameraY < this.cameraTargetY - this.displayHeight * 0.5) {
+      this.cameraTargetY = idealCameraY + this.displayHeight * 0.3;
     }
     
     this.cameraY += (this.cameraTargetY - this.cameraY) * this.CAMERA_SMOOTHING * deltaTime;
@@ -258,10 +317,12 @@ export class Game {
     if (this.player.isInvincible) return;
     
     this.state.lives--;
+    this.sound.play('hit');
     
     if (this.state.lives <= 0) {
       this.state.gameOver = true;
       this.screenState = 'gameover';
+      this.sound.play('gameover');
       this.setupEndScreenListener();
     } else {
       this.player.hit();
@@ -296,8 +357,8 @@ export class Game {
   
   private render(time: number): void {
     const ctx = this.ctx;
-    const width = this.canvas.width;
-    const height = this.canvas.height;
+    const width = this.displayWidth;
+    const height = this.displayHeight;
     
     // Clear with gradient background
     const gradient = ctx.createLinearGradient(0, 0, 0, height);
@@ -393,25 +454,25 @@ export class Game {
   
   private renderIntroScreen(time: number): void {
     const ctx = this.ctx;
-    const width = this.canvas.width;
-    const height = this.canvas.height;
+    const width = this.displayWidth;
+    const height = this.displayHeight;
     
     // Semi-transparent overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
     ctx.fillRect(0, 0, width, height);
     
-    // Title
+    // Title - using Pilowlava font
     ctx.textAlign = 'center';
     ctx.fillStyle = '#e74c3c';
-    ctx.font = 'bold 72px "Comic Sans MS", cursive, sans-serif';
-    ctx.fillText('NEO', width / 2, height * 0.18);
-    ctx.fillText('METEOR', width / 2, height * 0.28);
+    ctx.font = `72px ${FONT_TITLE}`;
+    ctx.fillText(TEXT.title.line1, width / 2, height * 0.18);
+    ctx.fillText(TEXT.title.line2, width / 2, height * 0.28);
     
-    // Subtitle
+    // Subtitle - using Space Mono
     ctx.fillStyle = '#d4c4a8';
-    ctx.font = '28px "Georgia", serif';
-    ctx.fillText('Lieber Neo', width / 2, height * 0.38);
-    ctx.fillText('Alles Gute im neuen Jahr!', width / 2, height * 0.44);
+    ctx.font = `28px ${FONT_BODY}`;
+    ctx.fillText(TEXT.intro.subtitle1, width / 2, height * 0.38);
+    ctx.fillText(TEXT.intro.subtitle2, width / 2, height * 0.44);
     
     // Start button
     const btnWidth = 280;
@@ -429,20 +490,20 @@ export class Game {
     ctx.lineWidth = 3;
     ctx.strokeRect(btnX, btnY, btnWidth, btnHeight);
     
-    // Button text
+    // Button text - using Space Mono
     ctx.fillStyle = '#1a1a2e';
-    ctx.font = 'bold 32px monospace';
-    ctx.fillText('Start!', width / 2, btnY + btnHeight / 2 + 10);
+    ctx.font = `bold 32px ${FONT_BODY}`;
+    ctx.fillText(TEXT.intro.startButton, width / 2, btnY + btnHeight / 2 + 10);
     
-    // Additional text
+    // Additional text - using Space Mono
     ctx.fillStyle = '#c9a87c';
-    ctx.font = '20px "Georgia", serif';
-    ctx.fillText('Hast du am 23.3.2025 schon Pläne?', width / 2, height * 0.70);
-    ctx.fillText('Ich würde gerne einen kleinen', width / 2, height * 0.75);
-    ctx.fillText('Ausflug mit dir machen.', width / 2, height * 0.80);
+    ctx.font = `20px ${FONT_BODY}`;
+    ctx.fillText(TEXT.intro.message1, width / 2, height * 0.70);
+    ctx.fillText(TEXT.intro.message2, width / 2, height * 0.75);
+    ctx.fillText(TEXT.intro.message3, width / 2, height * 0.80);
     
-    ctx.fillText('Bis dahin kannst du mal versuchen', width / 2, height * 0.88);
-    ctx.fillText('die Meteoriten zu erwischen.', width / 2, height * 0.93);
+    ctx.fillText(TEXT.intro.hint1, width / 2, height * 0.88);
+    ctx.fillText(TEXT.intro.hint2, width / 2, height * 0.93);
     
     // Hide touch controls on intro
     const touchControls = document.getElementById('touch-controls');
@@ -508,54 +569,54 @@ export class Game {
   
   private renderWinScreen(): void {
     const ctx = this.ctx;
-    const width = this.canvas.width;
-    const height = this.canvas.height;
+    const width = this.displayWidth;
+    const height = this.displayHeight;
     
     // Overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.fillRect(0, 0, width, height);
     
-    // Congratulations
+    // Congratulations - using Pilowlava
     ctx.textAlign = 'center';
     ctx.fillStyle = '#f1c40f';
-    ctx.font = 'bold 56px "Comic Sans MS", cursive, sans-serif';
-    ctx.fillText('🎉 Geschafft! 🎉', width / 2, height * 0.25);
+    ctx.font = `56px ${FONT_TITLE}`;
+    ctx.fillText(TEXT.win.title, width / 2, height * 0.25);
     
     ctx.fillStyle = '#ffffff';
-    ctx.font = '32px "Georgia", serif';
-    ctx.fillText('Herzlichen Glückwunsch, Neo!', width / 2, height * 0.38);
+    ctx.font = `32px ${FONT_BODY}`;
+    ctx.fillText(TEXT.win.congratulations, width / 2, height * 0.38);
     
     ctx.fillStyle = '#d4c4a8';
-    ctx.font = '24px "Georgia", serif';
-    ctx.fillText('Du hast das Portal erreicht!', width / 2, height * 0.48);
+    ctx.font = `24px ${FONT_BODY}`;
+    ctx.fillText(TEXT.win.portalReached, width / 2, height * 0.48);
     
     // Score
     ctx.fillStyle = '#3498db';
-    ctx.font = 'bold 28px monospace';
-    ctx.fillText(`Endstand: ${this.state.score} Punkte`, width / 2, height * 0.58);
+    ctx.font = `bold 28px ${FONT_BODY}`;
+    ctx.fillText(interpolate(TEXT.win.finalScore, { score: this.state.score }), width / 2, height * 0.58);
     
     // Message
     ctx.fillStyle = '#c9a87c';
-    ctx.font = '22px "Georgia", serif';
-    ctx.fillText('Vergiss nicht:', width / 2, height * 0.72);
-    ctx.fillText('23. März 2025 - unser Ausflug!', width / 2, height * 0.78);
+    ctx.font = `22px ${FONT_BODY}`;
+    ctx.fillText(TEXT.win.reminder1, width / 2, height * 0.72);
+    ctx.fillText(TEXT.win.reminder2, width / 2, height * 0.78);
     
     // Restart hint
     ctx.fillStyle = '#888888';
-    ctx.font = '18px monospace';
-    ctx.fillText('Tippen oder SPACE für neues Spiel', width / 2, height * 0.90);
+    ctx.font = `18px ${FONT_BODY}`;
+    ctx.fillText(TEXT.win.restartHint, width / 2, height * 0.90);
   }
   
   private isVisible(y: number, height: number): boolean {
     const viewBottom = this.cameraY - 50;
-    const viewTop = this.cameraY + this.canvas.height + 50;
+    const viewTop = this.cameraY + this.displayHeight + 50;
     return y + height > viewBottom && y < viewTop;
   }
   
-  private renderBackground(time: number): void {
+  private renderBackground(_time: number): void {
     const ctx = this.ctx;
-    const width = this.canvas.width;
-    const height = this.canvas.height;
+    const width = this.displayWidth;
+    const height = this.displayHeight;
     
     ctx.fillStyle = '#ffffff';
     const starCount = 50;
@@ -586,38 +647,39 @@ export class Game {
     const padding = 20;
     
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 24px monospace';
+    ctx.font = `bold 24px ${FONT_BODY}`;
     ctx.textAlign = 'left';
-    ctx.fillText(`Score: ${this.state.score}`, padding, padding + 24);
+    ctx.fillText(interpolate(TEXT.ui.score, { score: this.state.score }), padding, padding + 24);
     
     ctx.fillStyle = '#e74c3c';
-    ctx.fillText(`♥ ${this.state.lives}`, padding, padding + 54);
+    ctx.fillText(interpolate(TEXT.ui.lives, { lives: this.state.lives }), padding, padding + 54);
     
     ctx.fillStyle = '#ffffff88';
-    ctx.font = '16px monospace';
-    ctx.fillText(`Height: ${Math.floor(this.highestY / TILE_SIZE)}m`, padding, padding + 80);
+    ctx.font = `16px ${FONT_BODY}`;
+    ctx.fillText(interpolate(TEXT.ui.height, { height: Math.floor(this.highestY / TILE_SIZE) }), padding, padding + 80);
   }
   
   private renderGameOver(): void {
     const ctx = this.ctx;
-    const width = this.canvas.width;
-    const height = this.canvas.height;
+    const width = this.displayWidth;
+    const height = this.displayHeight;
     
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(0, 0, width, height);
     
+    // Title - using Pilowlava
     ctx.fillStyle = '#e74c3c';
-    ctx.font = 'bold 48px monospace';
+    ctx.font = `48px ${FONT_TITLE}`;
     ctx.textAlign = 'center';
-    ctx.fillText('GAME OVER', width / 2, height / 2 - 40);
+    ctx.fillText(TEXT.gameOver.title, width / 2, height / 2 - 40);
     
     ctx.fillStyle = '#ffffff';
-    ctx.font = '24px monospace';
-    ctx.fillText(`Final Score: ${this.state.score}`, width / 2, height / 2 + 20);
+    ctx.font = `24px ${FONT_BODY}`;
+    ctx.fillText(interpolate(TEXT.gameOver.finalScore, { score: this.state.score }), width / 2, height / 2 + 20);
     
     ctx.fillStyle = '#888888';
-    ctx.font = '18px monospace';
-    ctx.fillText('Tap or press SPACE to restart', width / 2, height / 2 + 60);
+    ctx.font = `18px ${FONT_BODY}`;
+    ctx.fillText(TEXT.gameOver.restartHint, width / 2, height / 2 + 60);
   }
   
   private restart(): void {
@@ -632,7 +694,7 @@ export class Game {
     this.level = parseLevel(DEMO_LEVEL);
     this.player.respawn(this.level.playerStart.x, this.level.playerStart.y);
     
-    this.cameraY = this.player.getCenterY() - this.canvas.height * this.CAMERA_OFFSET_Y;
+    this.cameraY = this.player.getCenterY() - this.displayHeight * this.CAMERA_OFFSET_Y;
     this.cameraTargetY = this.cameraY;
     this.highestY = this.player.getCenterY();
     

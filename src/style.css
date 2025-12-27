@@ -1,3 +1,29 @@
+/* Custom Fonts */
+@font-face {
+  font-family: 'Pilowlava';
+  src: url('/assets/fonts/pilowlava/Fonts/webfonts/Pilowlava-Regular.woff2') format('woff2'),
+       url('/assets/fonts/pilowlava/Fonts/webfonts/Pilowlava-Regular.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Space Mono';
+  src: url('/assets/fonts/space-mono/SpaceMono-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Space Mono';
+  src: url('/assets/fonts/space-mono/SpaceMono-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -228,4 +254,60 @@ canvas {
     padding-left: calc(20px + env(safe-area-inset-left));
     padding-right: calc(20px + env(safe-area-inset-right));
   }
+}
+
+/* Loading Screen */
+#loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+
+#loading-screen.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#loading-screen .loading-title {
+  font-family: 'Pilowlava', 'Comic Sans MS', cursive;
+  font-size: 48px;
+  color: #e74c3c;
+  margin-bottom: 40px;
+  text-shadow: 0 0 20px rgba(231, 76, 60, 0.5);
+}
+
+#loading-screen .loading-status {
+  font-family: 'Space Mono', monospace;
+  font-size: 16px;
+  color: #888888;
+  margin-bottom: 20px;
+}
+
+#loading-screen .progress-container {
+  width: 300px;
+  max-width: 80%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+#loading-screen .progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #e74c3c, #c0392b);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
 }
