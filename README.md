@@ -1,6 +1,6 @@
 # New Year Game 2026
 
-A vertical platformer game built with TypeScript and Canvas. Jump your way up through platforms, avoid enemies, collect stars, and reach the portal at the top! Features custom fonts (Pilowlava & Space Mono), sound effects, and mobile touch controls.
+A vertical platformer game built with TypeScript and Canvas. Jump your way up through platforms, avoid enemies, collect stars, and reach the portal at the top!
 
 ## Live Versions
 
