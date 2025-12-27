@@ -119,33 +119,23 @@ export class AssetLoader {
   }
 
   private async loadFonts(onAssetLoaded: (name: string) => void): Promise<void> {
-    // Load fonts sequentially with timeout to prevent Safari mobile from hanging
-    for (const font of FONTS) {
-      const fontLabel = `Font: ${font.family}`;
-      
+    const fontPromises = FONTS.map(async (font) => {
       try {
         const fontFace = new FontFace(
           font.family,
           `url(${font.url})`,
           { weight: font.weight || 'normal' }
         );
-
-        // Race between font load and timeout (2 seconds for Safari)
-        const loadPromise = fontFace.load();
-        const timeoutPromise = new Promise<FontFace>((_, reject) => {
-          setTimeout(() => reject(new Error('Font load timeout')), 2000);
-        });
-
-        const loadedFont = await Promise.race([loadPromise, timeoutPromise]);
+        const loadedFont = await fontFace.load();
         document.fonts.add(loadedFont);
-        onAssetLoaded(fontLabel);
+        onAssetLoaded(`Font: ${font.family}`);
       } catch (error) {
         console.warn(`Failed to load font ${font.family}:`, error);
-        // Continue with fallback - don't block the game
-        onAssetLoaded(`${fontLabel} (fallback)`);
+        onAssetLoaded(`Font: ${font.family} (fallback)`);
       }
-    }
-    
+    });
+
+    await Promise.all(fontPromises);
     this.fontsLoaded = true;
   }
 
@@ -155,10 +145,33 @@ export class AssetLoader {
         const audio = new Audio();
         audio.preload = 'auto';
         
+        // Safari mobile doesn't fire canplaythrough due to autoplay restrictions
+        // Use a combination of events and timeout
         await new Promise<void>((resolve, reject) => {
-          audio.oncanplaythrough = () => resolve();
-          audio.onerror = () => reject(new Error(`Failed to load ${url}`));
+          let resolved = false;
+          
+          const done = () => {
+            if (!resolved) {
+              resolved = true;
+              resolve();
+            }
+          };
+          
+          // Try multiple events - Safari may fire loadeddata but not canplaythrough
+          audio.oncanplaythrough = done;
+          audio.onloadeddata = done;
+          audio.onerror = () => {
+            if (!resolved) {
+              resolved = true;
+              reject(new Error(`Failed to load ${url}`));
+            }
+          };
+          
+          // Timeout after 2 seconds - Safari may not fire any events due to autoplay policy
+          setTimeout(done, 2000);
+          
           audio.src = url;
+          audio.load(); // Explicitly call load() for Safari
         });
 
         this.sounds[name] = audio;
