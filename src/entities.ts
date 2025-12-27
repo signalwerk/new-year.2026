@@ -174,7 +174,12 @@ export function checkEnemyCollision(playerBounds: Rectangle, enemies: Enemy[]): 
     if (!enemy.alive) continue;
     
     if (intersects(playerBounds, enemy)) {
-      // Check if player is stomping (coming from above)
+      // Static hazards can NEVER be stomped - always hurt player
+      if (enemy.type === 'static') {
+        return { hit: true, stomped: false, enemy };
+      }
+      
+      // Check if player is stomping (coming from above) for other enemies
       const playerBottom = playerBounds.y;
       const enemyTop = enemy.y + enemy.height;
       const playerCenterX = playerBounds.x + playerBounds.width / 2;
@@ -272,26 +277,47 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, enemy: Enemy): void {
       break;
       
     case 'static':
-      // Circle (fire/hazard)
+      // Simple spiky hazard with dot eyes
+      const hcx = enemy.x + enemy.width / 2;
+      const hcy = enemy.y + enemy.height / 2;
+      const hRadius = Math.min(enemy.width, enemy.height) / 2;
+      const spikeCount = 8;
+      const spikeLength = hRadius * 0.5;
+      const rotation = Date.now() / 800; // Slow rotation
+      
+      // Draw spikes
+      ctx.fillStyle = enemy.color;
+      for (let i = 0; i < spikeCount; i++) {
+        const angle = (i / spikeCount) * Math.PI * 2 + rotation;
+        const tipX = hcx + Math.cos(angle) * (hRadius + spikeLength);
+        const tipY = hcy + Math.sin(angle) * (hRadius + spikeLength);
+        const baseAngle = Math.PI / spikeCount;
+        
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(
+          hcx + Math.cos(angle - baseAngle) * hRadius * 0.8,
+          hcy + Math.sin(angle - baseAngle) * hRadius * 0.8
+        );
+        ctx.lineTo(
+          hcx + Math.cos(angle + baseAngle) * hRadius * 0.8,
+          hcy + Math.sin(angle + baseAngle) * hRadius * 0.8
+        );
+        ctx.closePath();
+        ctx.fill();
+      }
+      
+      // Main body - single color circle
+      ctx.fillStyle = enemy.color;
       ctx.beginPath();
-      ctx.arc(
-        enemy.x + enemy.width / 2, 
-        enemy.y + enemy.height / 2, 
-        Math.min(enemy.width, enemy.height) / 2, 
-        0, 
-        Math.PI * 2
-      );
+      ctx.arc(hcx, hcy, hRadius * 0.85, 0, Math.PI * 2);
       ctx.fill();
-      // Inner glow
-      ctx.fillStyle = '#ffff00';
+      
+      // Simple dot eyes
+      ctx.fillStyle = '#000000';
       ctx.beginPath();
-      ctx.arc(
-        enemy.x + enemy.width / 2, 
-        enemy.y + enemy.height / 2, 
-        Math.min(enemy.width, enemy.height) / 4, 
-        0, 
-        Math.PI * 2
-      );
+      ctx.arc(hcx - hRadius * 0.25, hcy, hRadius * 0.15, 0, Math.PI * 2);
+      ctx.arc(hcx + hRadius * 0.25, hcy, hRadius * 0.15, 0, Math.PI * 2);
       ctx.fill();
       break;
       

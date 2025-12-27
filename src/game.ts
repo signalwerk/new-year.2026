@@ -103,7 +103,7 @@ export class Game {
     ];
     
     // Update player
-    this.player.update(deltaTime, inputState, allPlatforms);
+    this.player.update(deltaTime, inputState, allPlatforms, this.level.levelWidth);
     
     // Update entities
     updatePlatforms(this.level.platforms, deltaTime);

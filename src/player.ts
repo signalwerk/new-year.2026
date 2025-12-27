@@ -45,7 +45,7 @@ export class Player implements Entity {
     this.y = y - this.height / 2;
   }
   
-  update(deltaTime: number, input: InputState, platforms: Platform[]): void {
+  update(deltaTime: number, input: InputState, platforms: Platform[], levelWidth: number = 1240): void {
     if (!this.isAlive) return;
     
     const dt = deltaTime;
@@ -111,8 +111,15 @@ export class Player implements Entity {
     // Apply horizontal movement
     this.x += this.velocityX * dt;
     
-    // No horizontal collision with platforms (one-way platforms)
-    // This allows player to move through platforms horizontally
+    // Bounce off level boundaries (left and right walls)
+    const WALL_BOUNCE = 0.5; // Bounce factor
+    if (this.x < 0) {
+      this.x = 0;
+      this.velocityX = Math.abs(this.velocityX) * WALL_BOUNCE;
+    } else if (this.x + this.width > levelWidth) {
+      this.x = levelWidth - this.width;
+      this.velocityX = -Math.abs(this.velocityX) * WALL_BOUNCE;
+    }
     
     // Apply vertical movement
     this.y += this.velocityY * dt;
