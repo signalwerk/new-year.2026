@@ -119,23 +119,33 @@ export class AssetLoader {
   }
 
   private async loadFonts(onAssetLoaded: (name: string) => void): Promise<void> {
-    const fontPromises = FONTS.map(async (font) => {
+    // Load fonts sequentially with timeout to prevent Safari mobile from hanging
+    for (const font of FONTS) {
+      const fontLabel = `Font: ${font.family}`;
+      
       try {
         const fontFace = new FontFace(
           font.family,
           `url(${font.url})`,
           { weight: font.weight || 'normal' }
         );
-        const loadedFont = await fontFace.load();
+
+        // Race between font load and timeout (2 seconds for Safari)
+        const loadPromise = fontFace.load();
+        const timeoutPromise = new Promise<FontFace>((_, reject) => {
+          setTimeout(() => reject(new Error('Font load timeout')), 2000);
+        });
+
+        const loadedFont = await Promise.race([loadPromise, timeoutPromise]);
         document.fonts.add(loadedFont);
-        onAssetLoaded(`Font: ${font.family}${font.weight === 'bold' ? ' Bold' : ''}`);
+        onAssetLoaded(fontLabel);
       } catch (error) {
         console.warn(`Failed to load font ${font.family}:`, error);
-        onAssetLoaded(`Font: ${font.family} (fallback)`);
+        // Continue with fallback - don't block the game
+        onAssetLoaded(`${fontLabel} (fallback)`);
       }
-    });
-
-    await Promise.all(fontPromises);
+    }
+    
     this.fontsLoaded = true;
   }
 
