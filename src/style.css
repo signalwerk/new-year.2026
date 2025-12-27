@@ -93,13 +93,15 @@ canvas {
 }
 
 .dpad-arrow {
-  font-size: 20px;
-  color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.25);
   transition: color 0.1s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .dpad.active .dpad-arrow {
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.4);
 }
 
 /* The draggable knob */
@@ -137,8 +139,6 @@ canvas {
   border: 3px solid rgba(255, 255, 255, 0.4);
   background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.7);
-  font-size: 28px;
-  /* font-weight: bold; */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -163,9 +163,13 @@ canvas {
 .jump-btn {
   width: 100px;
   height: 100px;
-  font-size: 40px;
   background: rgba(52, 152, 219, 0.15);
   border-color: rgba(52, 152, 219, 0.5);
+}
+
+.jump-btn svg {
+  width: 40px;
+  height: 40px;
 }
 
 .jump-btn:hover {

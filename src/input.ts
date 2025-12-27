@@ -76,13 +76,21 @@ export class InputHandler {
         <div id="dpad" class="dpad">
           <div id="dpad-knob" class="dpad-knob"></div>
           <div class="dpad-arrows">
-            <span class="dpad-arrow left">◀</span>
-            <span class="dpad-arrow right">▶</span>
+            <svg class="dpad-arrow left" viewBox="0 0 24 24" width="20" height="20">
+              <polygon points="18,4 18,20 6,12" fill="currentColor"/>
+            </svg>
+            <svg class="dpad-arrow right" viewBox="0 0 24 24" width="20" height="20">
+              <polygon points="6,4 6,20 18,12" fill="currentColor"/>
+            </svg>
           </div>
         </div>
       </div>
       <div class="controls-right">
-        <button id="btn-jump" class="control-btn jump-btn">▲</button>
+        <button id="btn-jump" class="control-btn jump-btn">
+          <svg viewBox="0 0 24 24" width="32" height="32">
+            <polygon points="12,4 22,20 2,20" fill="currentColor"/>
+          </svg>
+        </button>
       </div>
     `;
     document.body.appendChild(container);
