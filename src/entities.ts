@@ -43,6 +43,9 @@ export function updateEnemies(enemies: Enemy[], platforms: Platform[], deltaTime
       case 'jumper':
         updateJumperEnemy(enemy, deltaTime);
         break;
+      case 'flyer':
+        updateFlyerEnemy(enemy, deltaTime);
+        break;
       case 'static':
         // Static enemies don't move
         break;
@@ -86,9 +89,32 @@ function updateWalkerEnemy(enemy: Enemy, platforms: Platform[], deltaTime: numbe
 }
 
 function updateJumperEnemy(enemy: Enemy, deltaTime: number): void {
-  // Simple bounce animation
-  const time = Date.now() / 500;
-  enemy.y = (enemy.startX || enemy.y) + Math.sin(time) * 20; // Using startX to store base Y
+  // Simple bounce animation - faster
+  const time = Date.now() / 300;
+  enemy.y = (enemy.startY || enemy.y) + Math.sin(time) * 25;
+}
+
+function updateFlyerEnemy(enemy: Enemy, deltaTime: number): void {
+  // Flyer moves horizontally and bobs up/down
+  const time = Date.now() / 400;
+  
+  // Horizontal patrol
+  enemy.x += enemy.velocityX * enemy.direction * deltaTime;
+  
+  // Check patrol range
+  const patrolRange = enemy.patrolRange || 80;
+  if (enemy.startX !== undefined) {
+    if (enemy.x > enemy.startX + patrolRange) {
+      enemy.direction = -1;
+    } else if (enemy.x < enemy.startX - patrolRange) {
+      enemy.direction = 1;
+    }
+  }
+  
+  // Vertical bobbing
+  if (enemy.startY !== undefined) {
+    enemy.y = enemy.startY + Math.sin(time) * 30;
+  }
 }
 
 // Update cannons and fire projectiles
@@ -97,13 +123,13 @@ export function updateCannons(cannons: Cannon[], projectiles: Projectile[], time
     const timeSinceLastFire = (time - cannon.lastFired) / 1000;
     
     if (timeSinceLastFire >= cannon.fireRate) {
-      // Fire a new projectile
+      // Fire a new projectile - faster speed
       const projectile: Projectile = {
         x: cannon.direction === 1 ? cannon.x + cannon.width : cannon.x - 15,
         y: cannon.y + cannon.height / 2 - 7,
         width: 15,
         height: 15,
-        velocityX: cannon.direction * 250,
+        velocityX: cannon.direction * 350,
         velocityY: 0,
         active: true,
         color: '#ff6b6b',
@@ -266,6 +292,46 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, enemy: Enemy): void {
         0, 
         Math.PI * 2
       );
+      ctx.fill();
+      break;
+      
+    case 'flyer':
+      // Bat-like shape - diamond body with wings
+      const cx = enemy.x + enemy.width / 2;
+      const cy = enemy.y + enemy.height / 2;
+      const wingSpan = enemy.width * 0.6;
+      const wingOffset = Math.sin(Date.now() / 100) * 5; // Flapping animation
+      
+      // Body (diamond)
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - enemy.height * 0.4);
+      ctx.lineTo(cx + enemy.width * 0.25, cy);
+      ctx.lineTo(cx, cy + enemy.height * 0.4);
+      ctx.lineTo(cx - enemy.width * 0.25, cy);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Left wing
+      ctx.beginPath();
+      ctx.moveTo(cx - enemy.width * 0.2, cy);
+      ctx.lineTo(cx - wingSpan, cy - wingOffset);
+      ctx.lineTo(cx - enemy.width * 0.15, cy + enemy.height * 0.2);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Right wing
+      ctx.beginPath();
+      ctx.moveTo(cx + enemy.width * 0.2, cy);
+      ctx.lineTo(cx + wingSpan, cy - wingOffset);
+      ctx.lineTo(cx + enemy.width * 0.15, cy + enemy.height * 0.2);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Eyes
+      ctx.fillStyle = '#ff0000';
+      ctx.beginPath();
+      ctx.arc(cx - 4, cy - 3, 2, 0, Math.PI * 2);
+      ctx.arc(cx + 4, cy - 3, 2, 0, Math.PI * 2);
       ctx.fill();
       break;
   }

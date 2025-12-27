@@ -29,11 +29,12 @@ export interface Platform extends Rectangle {
 }
 
 export interface Enemy extends Entity {
-  type: 'walker' | 'jumper' | 'static';
+  type: 'walker' | 'jumper' | 'static' | 'flyer';
   color: string;
   direction: 1 | -1;
   patrolRange?: number;
   startX?: number;
+  startY?: number;
   alive: boolean;
 }
 
@@ -103,6 +104,8 @@ export const TILE_TYPES = {
   'J': 'enemy-jumper',
   '🔥': 'enemy-static',
   'S': 'enemy-static',
+  '🦇': 'enemy-flyer',
+  'F': 'enemy-flyer',
   
   // Cannons
   '►': 'cannon-right',

@@ -24,11 +24,21 @@ export class Player implements Entity {
   facingRight: boolean = true;
   isAlive: boolean = true;
   
+  // Invincibility state
+  isInvincible: boolean = false;
+  invincibilityTimer: number = 0;
+  private readonly INVINCIBILITY_DURATION = 2; // seconds
+  
+  // Hit flash effect
+  hitFlashTimer: number = 0;
+  private readonly HIT_FLASH_DURATION = 0.15; // seconds
+  
   // Platform the player is standing on (for moving platform support)
   currentPlatform: Platform | null = null;
   
   // Visual
   color: string = '#3498db';
+  private baseColor: string = '#3498db';
   
   constructor(x: number, y: number) {
     this.x = x - this.width / 2;
@@ -40,6 +50,20 @@ export class Player implements Entity {
     
     const dt = deltaTime;
     const control = this.isOnGround ? 1 : this.AIR_CONTROL;
+    
+    // Update invincibility timer
+    if (this.isInvincible) {
+      this.invincibilityTimer -= dt;
+      if (this.invincibilityTimer <= 0) {
+        this.isInvincible = false;
+        this.invincibilityTimer = 0;
+      }
+    }
+    
+    // Update hit flash timer
+    if (this.hitFlashTimer > 0) {
+      this.hitFlashTimer -= dt;
+    }
     
     // Apply moving platform velocity if standing on one
     if (this.currentPlatform && this.currentPlatform.type === 'moving' && this.currentPlatform.currentVelocityX) {
@@ -178,20 +202,74 @@ export class Player implements Entity {
     this.color = '#7f8c8d';
   }
   
+  // Called when player gets hit but doesn't die
+  hit(): void {
+    if (this.isInvincible) return; // Can't be hit while invincible
+    
+    // Start invincibility
+    this.isInvincible = true;
+    this.invincibilityTimer = this.INVINCIBILITY_DURATION;
+    
+    // Start hit flash
+    this.hitFlashTimer = this.HIT_FLASH_DURATION;
+    
+    // Small knockback
+    this.velocityY = 200;
+  }
+  
   respawn(x: number, y: number): void {
     this.x = x - this.width / 2;
     this.y = y - this.height / 2;
     this.velocityX = 0;
     this.velocityY = 0;
     this.isAlive = true;
-    this.color = '#3498db';
+    this.color = this.baseColor;
+    this.isInvincible = false;
+    this.invincibilityTimer = 0;
+    this.hitFlashTimer = 0;
+  }
+  
+  // Reset invincibility (for full respawn)
+  resetInvincibility(): void {
+    this.isInvincible = true;
+    this.invincibilityTimer = this.INVINCIBILITY_DURATION;
   }
   
   // Render the player
   render(ctx: CanvasRenderingContext2D): void {
+    // Skip rendering every other frame when invincible (blinking effect)
+    if (this.isInvincible) {
+      const blinkRate = 8; // Blinks per second
+      const blink = Math.floor(Date.now() / (1000 / blinkRate / 2)) % 2;
+      if (blink === 0) {
+        // Draw semi-transparent during "off" blink frames
+        ctx.globalAlpha = 0.3;
+      }
+    }
+    
+    // Determine color based on state
+    let bodyColor = this.color;
+    if (this.hitFlashTimer > 0) {
+      // Flash red/white when hit
+      const flashPhase = Math.floor(this.hitFlashTimer * 20) % 2;
+      bodyColor = flashPhase === 0 ? '#ff0000' : '#ffffff';
+    }
+    
     // Body (rectangle)
-    ctx.fillStyle = this.color;
+    ctx.fillStyle = bodyColor;
     ctx.fillRect(this.x, this.y, this.width, this.height);
+    
+    // Draw hit effect ring
+    if (this.hitFlashTimer > 0) {
+      const ringSize = (this.HIT_FLASH_DURATION - this.hitFlashTimer) / this.HIT_FLASH_DURATION * 50;
+      ctx.strokeStyle = '#ff0000';
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = 1 - (ringSize / 50);
+      ctx.beginPath();
+      ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 2 + ringSize, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = this.isInvincible ? 0.3 : 1;
+    }
     
     // Eyes
     const eyeY = this.y + this.height * 0.3;
@@ -223,6 +301,9 @@ export class Player implements Entity {
       ctx.arc(this.x + this.width * 0.35, eyeY, eyeSize * 0.5, 0, Math.PI * 2);
       ctx.fill();
     }
+    
+    // Reset alpha
+    ctx.globalAlpha = 1;
   }
 }
 

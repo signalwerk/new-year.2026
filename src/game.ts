@@ -89,8 +89,21 @@ export class Game {
     // Get input
     const inputState = this.input.getState();
     
+    // Create combined platforms list (including cannons as platforms)
+    const allPlatforms = [
+      ...this.level.platforms,
+      ...this.level.cannons.map(cannon => ({
+        x: cannon.x,
+        y: cannon.y,
+        width: cannon.width,
+        height: cannon.height,
+        type: 'normal' as const,
+        color: cannon.color,
+      }))
+    ];
+    
     // Update player
-    this.player.update(deltaTime, inputState, this.level.platforms);
+    this.player.update(deltaTime, inputState, allPlatforms);
     
     // Update entities
     updatePlatforms(this.level.platforms, deltaTime);
@@ -98,24 +111,26 @@ export class Game {
     updateCannons(this.level.cannons, this.level.projectiles, performance.now());
     updateProjectiles(this.level.projectiles, deltaTime, this.level.levelWidth);
     
-    // Check enemy collisions
-    const enemyHit = checkEnemyCollision(this.player.getBounds(), this.level.enemies);
-    if (enemyHit.hit && enemyHit.enemy) {
-      if (enemyHit.stomped) {
-        // Player stomped on enemy
-        enemyHit.enemy.alive = false;
-        this.state.score += 100;
-        // Bounce player up
-        this.player.velocityY = 400;
-      } else {
-        // Player got hit
+    // Check enemy collisions (only if not invincible)
+    if (!this.player.isInvincible) {
+      const enemyHit = checkEnemyCollision(this.player.getBounds(), this.level.enemies);
+      if (enemyHit.hit && enemyHit.enemy) {
+        if (enemyHit.stomped) {
+          // Player stomped on enemy
+          enemyHit.enemy.alive = false;
+          this.state.score += 100;
+          // Bounce player up
+          this.player.velocityY = 400;
+        } else {
+          // Player got hit
+          this.playerHit();
+        }
+      }
+      
+      // Check projectile collisions
+      if (checkProjectileCollision(this.player.getBounds(), this.level.projectiles)) {
         this.playerHit();
       }
-    }
-    
-    // Check projectile collisions
-    if (checkProjectileCollision(this.player.getBounds(), this.level.projectiles)) {
-      this.playerHit();
     }
     
     // Check collectibles
@@ -160,30 +175,33 @@ export class Game {
     
     // Smooth camera movement
     this.cameraY += (this.cameraTargetY - this.cameraY) * this.CAMERA_SMOOTHING * deltaTime;
+    
+    // Update screen shake
+    if (this.screenShakeTimer > 0) {
+      this.screenShakeTimer -= deltaTime;
+    }
   }
   
   private playerHit(): void {
+    // Don't process hit if player is invincible
+    if (this.player.isInvincible) return;
+    
     this.state.lives--;
     
     if (this.state.lives <= 0) {
       this.state.gameOver = true;
     } else {
-      // Respawn at a safe position (nearest platform below current position)
-      let respawnY = this.level.playerStart.y;
-      let respawnX = this.level.playerStart.x;
+      // Keep position, just trigger hit effect and invincibility
+      this.player.hit();
       
-      for (const platform of this.level.platforms) {
-        if (platform.y < this.player.y && platform.y > respawnY - 200) {
-          respawnY = platform.y + platform.height + this.player.height;
-          respawnX = platform.x + platform.width / 2;
-          break;
-        }
-      }
-      
-      this.player.respawn(respawnX, respawnY);
-      this.cameraTargetY = this.player.getCenterY() - this.canvas.height * this.CAMERA_OFFSET_Y;
+      // Screen shake effect (visual feedback)
+      this.screenShakeTimer = 0.2;
     }
   }
+  
+  // Screen shake
+  private screenShakeTimer: number = 0;
+  private readonly SCREEN_SHAKE_INTENSITY = 8;
   
   private render(time: number): void {
     const ctx = this.ctx;
@@ -203,9 +221,17 @@ export class Game {
     // Set up camera transform
     ctx.save();
     
+    // Apply screen shake
+    let shakeX = 0;
+    let shakeY = 0;
+    if (this.screenShakeTimer > 0) {
+      shakeX = (Math.random() - 0.5) * this.SCREEN_SHAKE_INTENSITY * 2;
+      shakeY = (Math.random() - 0.5) * this.SCREEN_SHAKE_INTENSITY * 2;
+    }
+    
     // Center horizontally, scroll vertically
     const cameraX = Math.max(0, this.player.getCenterX() - width / 2);
-    ctx.translate(-cameraX, this.cameraY + height);
+    ctx.translate(-cameraX + shakeX, this.cameraY + height + shakeY);
     ctx.scale(1, -1); // Flip Y so positive is up
     
     // Render platforms
@@ -247,6 +273,13 @@ export class Game {
     this.player.render(ctx);
     
     ctx.restore();
+    
+    // Draw hit flash overlay
+    if (this.player.hitFlashTimer > 0) {
+      const flashAlpha = this.player.hitFlashTimer / 0.15 * 0.4;
+      ctx.fillStyle = `rgba(255, 0, 0, ${flashAlpha})`;
+      ctx.fillRect(0, 0, width, height);
+    }
     
     // Render UI (not affected by camera)
     this.renderUI();
