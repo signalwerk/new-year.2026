@@ -8,15 +8,14 @@ import {
   updateCannons,
   updateProjectiles,
   checkEnemyCollision,
-  checkCollectiblePickup,
   checkProjectileCollision,
   renderPlatform,
   renderEnemy,
-  renderCollectible,
   renderCannon,
   renderProjectile,
 } from './entities';
 import { TEXT, interpolate } from './config/text';
+import { COLORS } from './config/colors';
 import { SoundManager } from './assets/loader';
 
 // Font constants
@@ -50,7 +49,6 @@ export class Game {
   
   // Game state
   private state: GameState = {
-    score: 0,
     lives: 3,
     gameOver: false,
     won: false,
@@ -61,8 +59,8 @@ export class Game {
   private readonly BG_GRADIENT_TOP = '#1a1a2e';
   private readonly BG_GRADIENT_BOTTOM = '#0f0f1a';
   
-  // Track highest point reached
-  private highestY: number = 0;
+  // Portal height for distance calculation
+  private portalY: number = 0;
   
   // Screen shake
   private screenShakeTimer: number = 0;
@@ -133,11 +131,12 @@ export class Game {
     // Initialize camera
     this.cameraY = this.player.getCenterY() - this.displayHeight * this.CAMERA_OFFSET_Y;
     this.cameraTargetY = this.cameraY;
-    this.highestY = this.player.getCenterY();
+    
+    // Store portal Y position for distance calculation
+    this.portalY = this.level.portal ? this.level.portal.y : this.level.levelHeight;
     
     // Reset state
     this.state = {
-      score: 0,
       lives: 3,
       gameOver: false,
       won: false,
@@ -219,12 +218,8 @@ export class Game {
     updatePlatforms(this.level.platforms, deltaTime);
     updateEnemies(this.level.enemies, this.level.platforms, deltaTime);
     
-    // Track cannon fire for sound
-    const prevProjectileCount = this.level.projectiles.length;
+    // Update cannons (sound removed for performance)
     updateCannons(this.level.cannons, this.level.projectiles, performance.now());
-    if (this.level.projectiles.length > prevProjectileCount) {
-      this.sound.play('cannon');
-    }
     
     updateProjectiles(this.level.projectiles, deltaTime, this.level.levelWidth);
     
@@ -242,7 +237,6 @@ export class Game {
       if (enemyHit.hit && enemyHit.enemy) {
         if (enemyHit.stomped) {
           enemyHit.enemy.alive = false;
-          this.state.score += 100;
           this.player.velocityY = 400;
           this.sound.play('stomp');
         } else {
@@ -255,29 +249,6 @@ export class Game {
       }
     }
     
-    // Check collectibles
-    const collected = checkCollectiblePickup(this.player.getBounds(), this.level.collectibles);
-    if (collected) {
-      this.sound.play('coin');
-      switch (collected.type) {
-        case 'coin':
-          this.state.score += 10;
-          break;
-        case 'star':
-          this.state.score += 50;
-          break;
-        case 'powerup':
-          this.state.score += 100;
-          break;
-      }
-    }
-    
-    // Track highest point
-    if (this.player.getCenterY() > this.highestY) {
-      const heightBonus = Math.floor((this.player.getCenterY() - this.highestY) / TILE_SIZE);
-      this.state.score += heightBonus;
-      this.highestY = this.player.getCenterY();
-    }
     
     // Check if player died
     if (!this.player.isAlive) {
@@ -336,22 +307,28 @@ export class Game {
       this.restart();
       window.removeEventListener('keydown', handleKey);
       window.removeEventListener('touchstart', handleTouch);
+      window.removeEventListener('click', handleClick);
     };
     
     const handleKey = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
+      if (e.code === 'Space' || e.code === 'Enter') {
         restart(e);
       }
     };
     
     const handleTouch = (e: TouchEvent) => {
-      // Small delay to prevent accidental restart
-      setTimeout(() => restart(e), 100);
+      restart(e);
     };
     
+    const handleClick = (e: MouseEvent) => {
+      restart(e);
+    };
+    
+    // Small delay to prevent accidental restart
     setTimeout(() => {
       window.addEventListener('keydown', handleKey);
-      window.addEventListener('touchstart', handleTouch, { once: true });
+      window.addEventListener('touchstart', handleTouch);
+      window.addEventListener('click', handleClick);
     }, 500);
   }
   
@@ -407,13 +384,6 @@ export class Game {
         this.renderPortal(ctx, time);
       }
       
-      // Render collectibles
-      for (const collectible of this.level.collectibles) {
-        if (this.isVisible(collectible.y, collectible.height)) {
-          renderCollectible(ctx, collectible, time);
-        }
-      }
-      
       // Render enemies
       for (const enemy of this.level.enemies) {
         if (this.isVisible(enemy.y, enemy.height)) {
@@ -421,17 +391,19 @@ export class Game {
         }
       }
       
-      // Render cannons
-      for (const cannon of this.level.cannons) {
-        if (this.isVisible(cannon.y, cannon.height)) {
-          renderCannon(ctx, cannon);
-        }
-      }
       
       // Render projectiles
       for (const projectile of this.level.projectiles) {
         if (projectile.active && this.isVisible(projectile.y, projectile.height)) {
           renderProjectile(ctx, projectile);
+        }
+      }
+      
+
+      // Render cannons
+      for (const cannon of this.level.cannons) {
+        if (this.isVisible(cannon.y, cannon.height)) {
+          renderCannon(ctx, cannon);
         }
       }
       
@@ -459,58 +431,72 @@ export class Game {
     }
   }
   
-  private renderIntroScreen(time: number): void {
+  private renderIntroScreen(_time: number): void {
     const ctx = this.ctx;
     const width = this.displayWidth;
     const height = this.displayHeight;
     
-    // Semi-transparent overlay
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    // Black background overlay
+    ctx.fillStyle = COLORS.BACKGROUND;
     ctx.fillRect(0, 0, width, height);
     
-    // Title - using Pilowlava font
+    // Font sizes
+    const titleSize = Math.min(72, width * 0.15);
+    const subtitleSize = Math.min(24, width * 0.05);
+    const copySize = Math.min(18, width * 0.04);
+    const buttonFontSize = Math.min(24, width * 0.05);
+    
+    const titleLineHeight = titleSize * 1.2;
+    const subtitleLineHeight = subtitleSize * 1.4;
+    const copyLineHeight = copySize * 1.5;
+    
+    const x = width / 2;
+    const baseY = height / 4;
+    
+    // Draw title (multi-line support)
+    const titleLines = TEXT.title.split('\n');
+    const titleStartY = baseY - (titleLines.length - 1) * titleLineHeight;
+    
+    ctx.fillStyle = COLORS.GAMEOVER_TITLE;
+    ctx.font = `${titleSize}px ${FONT_TITLE}`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#e74c3c';
-    ctx.font = `72px ${FONT_TITLE}`;
-    ctx.fillText(TEXT.title.line1, width / 2, height * 0.18);
-    ctx.fillText(TEXT.title.line2, width / 2, height * 0.28);
+    ctx.textBaseline = 'middle';
+    titleLines.forEach((line, index) => {
+      ctx.fillText(line, x, titleStartY + index * titleLineHeight);
+    });
     
-    // Subtitle - using Space Mono
-    ctx.fillStyle = '#d4c4a8';
-    ctx.font = `28px ${FONT_BODY}`;
-    ctx.fillText(TEXT.intro.subtitle1, width / 2, height * 0.38);
-    ctx.fillText(TEXT.intro.subtitle2, width / 2, height * 0.44);
+    // Draw subtitle
+    ctx.fillStyle = COLORS.TEXT;
+    ctx.font = `${subtitleSize}px ${FONT_BODY}`;
+    const subtitleLines = TEXT.subtitle.split('\n');
+    subtitleLines.forEach((line, index) => {
+      ctx.fillText(line, x, baseY + titleLineHeight + index * subtitleLineHeight);
+    });
     
-    // Start button
-    const btnWidth = 280;
-    const btnHeight = 70;
+    // Button dimensions
+    const btnWidth = Math.min(280, width * 0.7);
+    const btnHeight = 60;
     const btnX = width / 2 - btnWidth / 2;
-    const btnY = height * 0.52;
+    const btnY = height * 0.48;
     
-    // Button glow
-    const pulse = Math.sin(time / 500) * 0.1 + 0.9;
-    ctx.fillStyle = `rgba(106, 137, 128, ${0.8 * pulse})`;
+    // Button background
+    ctx.fillStyle = COLORS.BUTTON;
     ctx.fillRect(btnX, btnY, btnWidth, btnHeight);
     
-    // Button border
-    ctx.strokeStyle = '#5a7a70';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(btnX, btnY, btnWidth, btnHeight);
+    // Button text
+    ctx.fillStyle = COLORS.BUTTON_TEXT;
+    ctx.font = `${buttonFontSize}px ${FONT_BODY}`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(TEXT.startButton, x, btnY + btnHeight * 0.52);
     
-    // Button text - using Space Mono
-    ctx.fillStyle = '#1a1a2e';
-    ctx.font = `32px ${FONT_BODY}`;
-    ctx.fillText(TEXT.intro.startButton, width / 2, btnY + btnHeight / 2 + 10);
-    
-    // Additional text - using Space Mono
-    ctx.fillStyle = '#c9a87c';
-    ctx.font = `20px ${FONT_BODY}`;
-    ctx.fillText(TEXT.intro.message1, width / 2, height * 0.70);
-    ctx.fillText(TEXT.intro.message2, width / 2, height * 0.75);
-    ctx.fillText(TEXT.intro.message3, width / 2, height * 0.80);
-    
-    ctx.fillText(TEXT.intro.hint1, width / 2, height * 0.88);
-    ctx.fillText(TEXT.intro.hint2, width / 2, height * 0.93);
+    // Draw copy text (multi-line support)
+    ctx.fillStyle = COLORS.TEXT;
+    ctx.font = `${copySize}px ${FONT_BODY}`;
+    const copyLines = TEXT.copy.split('\n');
+    const copyStartY = height * 0.65;
+    copyLines.forEach((line, index) => {
+      ctx.fillText(line, x, copyStartY + index * copyLineHeight);
+    });
     
     // Hide touch controls on intro
     const touchControls = document.getElementById('touch-controls');
@@ -579,39 +565,57 @@ export class Game {
     const width = this.displayWidth;
     const height = this.displayHeight;
     
-    // Overlay
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    // Black background
+    ctx.fillStyle = COLORS.BACKGROUND;
     ctx.fillRect(0, 0, width, height);
     
-    // Congratulations - using Pilowlava
+    // Font sizes
+    const titleSize = Math.min(56, width * 0.12);
+    const copySize = Math.min(18, width * 0.04);
+    const buttonFontSize = Math.min(24, width * 0.05);
+    
+    const titleLineHeight = titleSize * 1.2;
+    const copyLineHeight = copySize * 1.5;
+    
+    const x = width / 2;
+    const baseY = height / 4;
+    
+    // Draw title (multi-line support)
+    const titleLines = TEXT.win.title.split('\n');
+    const titleStartY = baseY - (titleLines.length - 1) * titleLineHeight;
+    
+    ctx.fillStyle = COLORS.WIN_TITLE;
+    ctx.font = `${titleSize}px ${FONT_TITLE}`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#f1c40f';
-    ctx.font = `56px ${FONT_TITLE}`;
-    ctx.fillText(TEXT.win.title, width / 2, height * 0.25);
+    ctx.textBaseline = 'middle';
+    titleLines.forEach((line, index) => {
+      ctx.fillText(line, x, titleStartY + index * titleLineHeight);
+    });
     
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `32px ${FONT_BODY}`;
-    ctx.fillText(TEXT.win.congratulations, width / 2, height * 0.38);
+    // Button dimensions
+    const btnWidth = Math.min(280, width * 0.7);
+    const btnHeight = 60;
+    const btnX = width / 2 - btnWidth / 2;
+    const btnY = height * 0.42;
     
-    ctx.fillStyle = '#d4c4a8';
-    ctx.font = `24px ${FONT_BODY}`;
-    ctx.fillText(TEXT.win.portalReached, width / 2, height * 0.48);
+    // Button background
+    ctx.fillStyle = COLORS.BUTTON;
+    ctx.fillRect(btnX, btnY, btnWidth, btnHeight);
     
-    // Score
-    ctx.fillStyle = '#3498db';
-    ctx.font = `28px ${FONT_BODY}`;
-    ctx.fillText(interpolate(TEXT.win.finalScore, { score: this.state.score }), width / 2, height * 0.58);
+    // Button text
+    ctx.fillStyle = COLORS.BUTTON_TEXT;
+    ctx.font = `${buttonFontSize}px ${FONT_BODY}`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(TEXT.win.restartButton, x, btnY + btnHeight * 0.52);
     
-    // Message
-    ctx.fillStyle = '#c9a87c';
-    ctx.font = `22px ${FONT_BODY}`;
-    ctx.fillText(TEXT.win.reminder1, width / 2, height * 0.72);
-    ctx.fillText(TEXT.win.reminder2, width / 2, height * 0.78);
-    
-    // Restart hint
-    ctx.fillStyle = '#888888';
-    ctx.font = `18px ${FONT_BODY}`;
-    ctx.fillText(TEXT.win.restartHint, width / 2, height * 0.90);
+    // Draw copy text (multi-line support)
+    ctx.fillStyle = COLORS.TEXT;
+    ctx.font = `${copySize}px ${FONT_BODY}`;
+    const copyLines = TEXT.win.copy.split('\n');
+    const copyStartY = height * 0.60;
+    copyLines.forEach((line, index) => {
+      ctx.fillText(line, x, copyStartY + index * copyLineHeight);
+    });
   }
   
   private isVisible(y: number, height: number): boolean {
@@ -653,17 +657,18 @@ export class Game {
     const ctx = this.ctx;
     const padding = 20;
     
-    ctx.fillStyle = '#ffffff';
+    // Calculate distance to portal (in tiles, counting down to 0)
+    const distanceToPortal = Math.max(0, Math.floor((this.portalY - this.player.getCenterY()) / TILE_SIZE));
+    
+    // Distance to goal
+    ctx.fillStyle = COLORS.TEXT;
     ctx.font = `24px ${FONT_BODY}`;
     ctx.textAlign = 'left';
-    ctx.fillText(interpolate(TEXT.ui.score, { score: this.state.score }), padding, padding + 24);
+    ctx.fillText(interpolate(TEXT.ui.distance, { height: distanceToPortal }), padding, padding + 24);
     
-    ctx.fillStyle = '#e74c3c';
+    // Lives
+    ctx.fillStyle = COLORS.LIVES;
     ctx.fillText(interpolate(TEXT.ui.lives, { lives: this.state.lives }), padding, padding + 54);
-    
-    ctx.fillStyle = '#ffffff88';
-    ctx.font = `16px ${FONT_BODY}`;
-    ctx.fillText(interpolate(TEXT.ui.height, { height: Math.floor(this.highestY / TILE_SIZE) }), padding, padding + 80);
   }
   
   private renderGameOver(): void {
@@ -671,22 +676,46 @@ export class Game {
     const width = this.displayWidth;
     const height = this.displayHeight;
     
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    // Black background
+    ctx.fillStyle = COLORS.BACKGROUND;
     ctx.fillRect(0, 0, width, height);
     
-    // Title - using Pilowlava
-    ctx.fillStyle = '#e74c3c';
-    ctx.font = `48px ${FONT_TITLE}`;
+    // Font sizes
+    const titleSize = Math.min(56, width * 0.12);
+    const buttonFontSize = Math.min(24, width * 0.05);
+    
+    const titleLineHeight = titleSize * 1.2;
+    
+    const x = width / 2;
+    const baseY = height / 3;
+    
+    // Draw title (multi-line support)
+    const titleLines = TEXT.gameOver.title.split('\n');
+    const titleStartY = baseY - (titleLines.length - 1) * titleLineHeight;
+    
+    ctx.fillStyle = COLORS.GAMEOVER_TITLE;
+    ctx.font = `${titleSize}px ${FONT_TITLE}`;
     ctx.textAlign = 'center';
-    ctx.fillText(TEXT.gameOver.title, width / 2, height / 2 - 40);
+    ctx.textBaseline = 'middle';
+    titleLines.forEach((line, index) => {
+      ctx.fillText(line, x, titleStartY + index * titleLineHeight);
+    });
     
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `24px ${FONT_BODY}`;
-    ctx.fillText(interpolate(TEXT.gameOver.finalScore, { score: this.state.score }), width / 2, height / 2 + 20);
+    // Button dimensions
+    const btnWidth = Math.min(280, width * 0.7);
+    const btnHeight = 60;
+    const btnX = width / 2 - btnWidth / 2;
+    const btnY = height * 0.52;
     
-    ctx.fillStyle = '#888888';
-    ctx.font = `18px ${FONT_BODY}`;
-    ctx.fillText(TEXT.gameOver.restartHint, width / 2, height / 2 + 60);
+    // Button background
+    ctx.fillStyle = COLORS.BUTTON;
+    ctx.fillRect(btnX, btnY, btnWidth, btnHeight);
+    
+    // Button text
+    ctx.fillStyle = COLORS.BUTTON_TEXT;
+    ctx.font = `${buttonFontSize}px ${FONT_BODY}`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(TEXT.gameOver.restartButton, x, btnY + btnHeight * 0.52);
   }
   
   private renderWalls(ctx: CanvasRenderingContext2D): void {
@@ -743,7 +772,6 @@ export class Game {
   
   private restart(): void {
     this.state = {
-      score: 0,
       lives: 3,
       gameOver: false,
       won: false,
@@ -755,7 +783,7 @@ export class Game {
     
     this.cameraY = this.player.getCenterY() - this.displayHeight * this.CAMERA_OFFSET_Y;
     this.cameraTargetY = this.cameraY;
-    this.highestY = this.player.getCenterY();
+    this.portalY = this.level.portal ? this.level.portal.y : this.level.levelHeight;
     
     this.screenState = 'playing';
   }

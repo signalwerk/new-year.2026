@@ -7,46 +7,39 @@ import { TEXT_NEO } from "./text-neo";
 import { TEXT_LUAN } from "./text-luan";
 import { TEXT_DEV } from "./text-dev";
 
-// Type definition for text configuration
+// Type definition for text configuration (matching Meteor Defense style)
 export interface TextConfig {
-  title: {
-    line1: string;
-    line2: string;
-  };
-  intro: {
-    subtitle1: string;
-    subtitle2: string;
-    startButton: string;
-    message1: string;
-    message2: string;
-    message3: string;
-    hint1: string;
-    hint2: string;
-  };
+  // Multi-line title (use \n for line breaks)
+  title: string;
+  // Subtitle shown below title
+  subtitle: string;
+  // Copy text (use \n for line breaks)
+  copy: string;
+  // Button text
+  startButton: string;
+  
+  // Win screen
   win: {
     title: string;
-    congratulations: string;
-    portalReached: string;
-    finalScore: string;
-    reminder1: string;
-    reminder2: string;
-    restartHint: string;
+    copy: string;
+    restartButton: string;
   };
+  
+  // Game over screen
   gameOver: {
     title: string;
-    finalScore: string;
-    restartHint: string;
+    restartButton: string;
   };
+  
+  // UI elements
   ui: {
-    score: string;
     lives: string;
-    height: string;
+    distance: string;
   };
+  
+  // Loading screen
   loading: {
     title: string;
-    loadingFonts: string;
-    loadingSounds: string;
-    ready: string;
   };
 }
 

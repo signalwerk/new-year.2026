@@ -24,9 +24,9 @@ const PLATFORM_COLORS = {
 
 const ENEMY_COLORS = {
   'walker': '#c94c4c',
-  'jumper': '#c9844c',
-  'static': '#c9c44c',
-  'flyer': '#8e44ad',
+  'jumper': '#c94c4c',
+  'static': '#c94c4c',
+  'flyer': '#c94c4c',
 };
 
 const COLLECTIBLE_COLORS = {

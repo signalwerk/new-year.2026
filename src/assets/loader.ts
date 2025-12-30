@@ -200,36 +200,59 @@ export class AssetLoader {
 
 /**
  * Sound Manager for playing game sounds
+ * Optimized to reuse audio elements and limit concurrent sounds
  */
 export class SoundManager {
-  private sounds: Record<string, HTMLAudioElement>;
+  private soundPools: Record<string, HTMLAudioElement[]> = {};
   private enabled = true;
   private volume = 0.5;
+  private readonly POOL_SIZE = 3; // Max concurrent instances per sound
 
   constructor(sounds: Record<string, HTMLAudioElement>) {
-    this.sounds = sounds;
     this.setVolume(this.volume);
+    
+    // Pre-create sound pools for better performance
+    for (const [name, sound] of Object.entries(sounds)) {
+      this.soundPools[name] = [sound];
+      // Pre-create additional instances for frequently used sounds
+      for (let i = 1; i < this.POOL_SIZE; i++) {
+        const clone = sound.cloneNode() as HTMLAudioElement;
+        clone.volume = this.volume;
+        this.soundPools[name].push(clone);
+      }
+    }
   }
 
   play(soundName: string): void {
     if (!this.enabled) return;
     
-    const sound = this.sounds[soundName];
-    if (sound) {
-      // Clone for overlapping sounds
-      const clone = sound.cloneNode() as HTMLAudioElement;
-      clone.volume = this.volume;
-      clone.play().catch(() => {
-        // Ignore autoplay restrictions
-      });
+    const pool = this.soundPools[soundName];
+    if (!pool || pool.length === 0) return;
+    
+    // Find an audio element that's not playing or is near the end
+    let audio = pool.find(a => a.paused || a.ended || a.currentTime === 0);
+    
+    // If all are playing, reuse the first one (oldest)
+    if (!audio) {
+      audio = pool[0];
     }
+    
+    // Reset and play
+    audio.currentTime = 0;
+    audio.volume = this.volume;
+    audio.play().catch(() => {
+      // Ignore autoplay restrictions
+    });
   }
 
   setVolume(volume: number): void {
     this.volume = Math.max(0, Math.min(1, volume));
-    Object.values(this.sounds).forEach(sound => {
-      sound.volume = this.volume;
-    });
+    // Update all pooled sounds
+    for (const pool of Object.values(this.soundPools)) {
+      for (const sound of pool) {
+        sound.volume = this.volume;
+      }
+    }
   }
 
   setEnabled(enabled: boolean): void {

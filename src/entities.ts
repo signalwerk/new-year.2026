@@ -237,9 +237,9 @@ export function renderPlatform(ctx: CanvasRenderingContext2D, platform: Platform
       ctx.stroke();
     }
   } else if (platform.type === 'moving') {
-    // Draw movement indicators
-    ctx.fillStyle = '#ffffff44';
-    ctx.fillRect(platform.x + 5, platform.y + 5, platform.width - 10, platform.height - 10);
+    // Draw movement indicators outline
+    // ctx.fillStyle = '#ffffff44';
+    // ctx.fillRect(platform.x + 5, platform.y + 5, platform.width - 10, platform.height - 10);
   } else if (platform.type === 'breakable') {
     // Draw cracks
     ctx.strokeStyle = '#00000044';
@@ -360,7 +360,7 @@ export function renderEnemy(ctx: CanvasRenderingContext2D, enemy: Enemy): void {
       ctx.fill();
       
       // Eyes
-      ctx.fillStyle = '#ff0000';
+      ctx.fillStyle = '#ffffff';
       ctx.beginPath();
       ctx.arc(cx - 4, cy - 3, 2, 0, Math.PI * 2);
       ctx.arc(cx + 4, cy - 3, 2, 0, Math.PI * 2);
@@ -442,11 +442,7 @@ function drawStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, spikes:
 
 // Render cannon
 export function renderCannon(ctx: CanvasRenderingContext2D, cannon: Cannon): void {
-  ctx.fillStyle = cannon.color;
-  
-  // Base (square)
-  ctx.fillRect(cannon.x, cannon.y, cannon.width, cannon.height);
-  
+
   // Barrel
   ctx.fillStyle = '#2c3e50';
   const barrelWidth = cannon.width * 0.6;
@@ -458,6 +454,12 @@ export function renderCannon(ctx: CanvasRenderingContext2D, cannon: Cannon): voi
   } else {
     ctx.fillRect(cannon.x - barrelWidth + 5, barrelY, barrelWidth, barrelHeight);
   }
+  
+  ctx.fillStyle = cannon.color;
+  
+  // Base (square)
+  ctx.fillRect(cannon.x, cannon.y, cannon.width, cannon.height);
+  
   
   // Highlight
   ctx.fillStyle = '#ffffff33';

@@ -82,7 +82,6 @@ export interface InputState {
 }
 
 export interface GameState {
-  score: number;
   lives: number;
   gameOver: boolean;
   won: boolean;
