@@ -200,18 +200,18 @@ export class Game {
     // Update player
     this.player.update(deltaTime, inputState, allPlatforms, this.level.levelWidth);
     
-    // Sound: Jump
-    if (!wasOnGroundBefore && this.player.isOnGround && velocityYBefore < -50) {
-      // Just landed
-      this.sound.play('land');
+    // Sound: Jump/Land/Bounce
+    if (!wasOnGroundBefore && this.player.isOnGround) {
+      // Just landed - play bounce if high velocity, otherwise land
+      if (velocityYBefore < -300) {
+        this.sound.play('bounce');
+      } else if (velocityYBefore < -50) {
+        this.sound.play('land');
+      }
     }
     if (wasOnGroundBefore && !this.player.isOnGround && this.player.velocityY > 0) {
       // Just jumped
       this.sound.play('jump');
-    }
-    // Sound: Bounce (from bouncy platform)
-    if (this.player.velocityY > 500 && velocityYBefore < 200) {
-      this.sound.play('bounce');
     }
     
     // Update entities

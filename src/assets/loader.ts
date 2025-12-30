@@ -199,59 +199,80 @@ export class AssetLoader {
 }
 
 /**
- * Sound Manager for playing game sounds
- * Optimized to reuse audio elements and limit concurrent sounds
+ * Sound Manager using Web Audio API for better mobile performance
+ * Web Audio API provides lower latency and doesn't block the main thread
  */
 export class SoundManager {
-  private soundPools: Record<string, HTMLAudioElement[]> = {};
+  private audioContext: AudioContext | null = null;
+  private buffers: Record<string, AudioBuffer> = {};
   private enabled = true;
   private volume = 0.5;
-  private readonly POOL_SIZE = 3; // Max concurrent instances per sound
+  private gainNode: GainNode | null = null;
+  private lastPlayTime: Record<string, number> = {};
+  private readonly MIN_PLAY_INTERVAL = 50; // Minimum ms between same sound plays
 
   constructor(sounds: Record<string, HTMLAudioElement>) {
-    this.setVolume(this.volume);
-    
-    // Pre-create sound pools for better performance
-    for (const [name, sound] of Object.entries(sounds)) {
-      this.soundPools[name] = [sound];
-      // Pre-create additional instances for frequently used sounds
-      for (let i = 1; i < this.POOL_SIZE; i++) {
-        const clone = sound.cloneNode() as HTMLAudioElement;
-        clone.volume = this.volume;
-        this.soundPools[name].push(clone);
+    // Initialize Web Audio API lazily (on first user interaction)
+    this.initAudioContext(sounds);
+  }
+
+  private async initAudioContext(sounds: Record<string, HTMLAudioElement>): Promise<void> {
+    try {
+      // Create AudioContext
+      this.audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      
+      // Create master gain node for volume control
+      this.gainNode = this.audioContext.createGain();
+      this.gainNode.gain.value = this.volume;
+      this.gainNode.connect(this.audioContext.destination);
+      
+      // Convert HTMLAudioElements to AudioBuffers
+      for (const [name, audio] of Object.entries(sounds)) {
+        try {
+          if (audio.src) {
+            const response = await fetch(audio.src);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+            this.buffers[name] = audioBuffer;
+          }
+        } catch (e) {
+          console.warn(`Failed to decode sound ${name}:`, e);
+        }
       }
+    } catch (e) {
+      console.warn('Web Audio API not supported, sounds disabled:', e);
+      this.enabled = false;
     }
   }
 
   play(soundName: string): void {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.audioContext || !this.gainNode) return;
     
-    const pool = this.soundPools[soundName];
-    if (!pool || pool.length === 0) return;
+    const buffer = this.buffers[soundName];
+    if (!buffer) return;
     
-    // Find an audio element that's not playing or is near the end
-    let audio = pool.find(a => a.paused || a.ended || a.currentTime === 0);
+    // Throttle repeated plays of the same sound
+    const now = performance.now();
+    const lastPlay = this.lastPlayTime[soundName] || 0;
+    if (now - lastPlay < this.MIN_PLAY_INTERVAL) return;
+    this.lastPlayTime[soundName] = now;
     
-    // If all are playing, reuse the first one (oldest)
-    if (!audio) {
-      audio = pool[0];
+    // Resume context if suspended (mobile browsers require user interaction)
+    if (this.audioContext.state === 'suspended') {
+      this.audioContext.resume();
     }
     
-    // Reset and play
-    audio.currentTime = 0;
-    audio.volume = this.volume;
-    audio.play().catch(() => {
-      // Ignore autoplay restrictions
-    });
+    // Create and play buffer source (very lightweight)
+    const source = this.audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.gainNode);
+    source.start(0);
   }
 
   setVolume(volume: number): void {
     this.volume = Math.max(0, Math.min(1, volume));
-    // Update all pooled sounds
-    for (const pool of Object.values(this.soundPools)) {
-      for (const sound of pool) {
-        sound.volume = this.volume;
-      }
+    if (this.gainNode) {
+      this.gainNode.gain.value = this.volume;
     }
   }
 
